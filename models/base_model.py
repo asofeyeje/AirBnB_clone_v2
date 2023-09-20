@@ -1,9 +1,15 @@
 #!/usr/bin/python3
 """test for BaseModel"""
 import unittest
+import models
+from uuid import uuid4
+from datetime import datetime
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy import Column
+from sqlalchemy import DateTime
+from sqlalchemy import String
 import os
 from os import getenv
-from models.base_model import BaseModel
 import pep8
 
 
