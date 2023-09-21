@@ -1,77 +1,77 @@
 #!/usr/bin/python3
-"""test for BaseModel"""
-import unittest
-import models
-from uuid import uuid4
+"""This module defines a base class for all models in our hbnb clone"""
+import uuid
 from datetime import datetime
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import Column
-from sqlalchemy import DateTime
-from sqlalchemy import String
-import os
-from os import getenv
-import pep8
+from sqlalchemy import Column, String, DATETIME
+from models import storage_type
+
+Base = declarative_base()
 
 
-class TestBaseModel(unittest.TestCase):
-    """this will test the base model class"""
+class BaseModel:
+    """A base class for all hbnb models
 
-    @classmethod
-    def setUpClass(cls):
-        """setup for the test"""
-        cls.base = BaseModel()
-        cls.base.name = "Kev"
-        cls.base.num = 20
+    Attributes:
+        id (sqlalchemy String): The BaseModel id.
+        created_at (sqlalchemy DateTime): The datetime at creation.
+        updated_at (sqlalchemy DateTime): The datetime of last update.
+    """
+    id = Column(String(60),
+                nullable=False,
+                primary_key=True,
+                unique=True)
+    created_at = Column(DATETIME,
+                        nullable=False,
+                        default=datetime.utcnow())
+    updated_at = Column(DATETIME,
+                        nullable=False,
+                        default=datetime.utcnow())
 
-    @classmethod
-    def teardown(cls):
-        """at the end of the test this will tear it down"""
-        del cls.base
+    def __init__(self, *args, **kwargs):
+        """Instatntiates a new model"""
+        if not kwargs:
+            self.id = str(uuid.uuid4())
+            self.created_at = datetime.now()
+            self.updated_at = datetime.now()
+        else:
+            for k in kwargs:
+                if k in ['created_at', 'updated_at']:
+                    setattr(self, k, datetime.fromisoformat(kwargs[k]))
+                elif k != '__class__':
+                    setattr(self, k, kwargs[k])
+            if storage_type == 'db':
+                if not hasattr(kwargs, 'id'):
+                    setattr(self, 'id', str(uuid.uuid4()))
+                if not hasattr(kwargs, 'created_at'):
+                    setattr(self, 'created_at', datetime.now())
+                if not hasattr(kwargs, 'updated_at'):
+                    setattr(self, 'updated_at', datetime.now())
 
-    def tearDown(self):
-        """teardown"""
-        try:
-            os.remove("file.json")
-        except Exception:
-            pass
+    def __str__(self):
+        """Returns a string representation of the instance"""
+        return '[{}] ({}) {}'.format(
+            self.__class__.__name__, self.id, self.__dict__)
 
-    def test_pep8_BaseModel(self):
-        """Testing for pep8"""
-        style = pep8.StyleGuide(quiet=True)
-        p = style.check_files(['models/base_model.py'])
-        self.assertEqual(p.total_errors, 0, "fix pep8")
+    def save(self):
+        """Updates updated_at with current time when instance is changed"""
+        from models import storage
+        self.updated_at = datetime.now()
+        storage.new(self)
+        storage.save()
 
-    def test_checking_for_docstring_BaseModel(self):
-        """checking for docstrings"""
-        self.assertIsNotNone(BaseModel.__doc__)
-        self.assertIsNotNone(BaseModel.__init__.__doc__)
-        self.assertIsNotNone(BaseModel.__str__.__doc__)
-        self.assertIsNotNone(BaseModel.save.__doc__)
-        self.assertIsNotNone(BaseModel.to_dict.__doc__)
+    def to_dict(self):
+        """Convert instance into dict format"""
+        dct = self.__dict__.copy()
+        dct['__class__'] = self.__class__.__name__
+        for k in dct:
+            if type(dct[k]) is datetime:
+                dct[k] = dct[k].isoformat()
+        if '_sa_instance_state' in dct.keys():
+            del(dct['_sa_instance_state'])
+        return dct
 
-    def test_method_BaseModel(self):
-        """chekcing if Basemodel have methods"""
-        self.assertTrue(hasattr(BaseModel, "__init__"))
-        self.assertTrue(hasattr(BaseModel, "save"))
-        self.assertTrue(hasattr(BaseModel, "to_dict"))
-
-    def test_init_BaseModel(self):
-        """test if the base is an type BaseModel"""
-        self.assertTrue(isinstance(self.base, BaseModel))
-
-    @unittest.skipIf(getenv("HBNB_TYPE_STORAGE") == 'db', 'DB')
-    def test_save_BaesModel(self):
-        """test if the save works"""
-        self.base.save()
-        self.assertNotEqual(self.base.created_at, self.base.updated_at)
-
-    def test_to_dict_BaseModel(self):
-        """test if dictionary works"""
-        base_dict = self.base.to_dict()
-        self.assertEqual(self.base.__class__.__name__, 'BaseModel')
-        self.assertIsInstance(base_dict['created_at'], str)
-        self.assertIsInstance(base_dict['updated_at'], str)
-
-
-if __name__ == "__main__":
-    unittest.main()
+    def delete(self):
+        '''deletes the current instance from the storage'''
+        from models import storage
+        storage.delete(self)
